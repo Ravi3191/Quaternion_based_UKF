@@ -9,16 +9,17 @@ Ukf::Ukf(int data_num) : data_(data_num) {
     //initialize vectors
     g_quat.w() = 0; g_quat.x() = 0; g_quat.y() = 0; g_quat.z() = 9.8;
 
-    Q = 11 * Eigen::MatrixXd::Identity(Q.rows(),Q.cols());
-    R = 15 * Eigen::MatrixXd::Identity(R.rows(),R.cols());
-    cov_prev_k = 50 * Eigen::MatrixXd::Identity(cov_prev_k.rows(),cov_prev_k.cols());
+    Q = PROCESS_NOISE_COEFF * Eigen::MatrixXd::Identity(Q.rows(),Q.cols());
+    R = MEASUREMENT_NOISE_COEFF * Eigen::MatrixXd::Identity(R.rows(),R.cols());
+    cov_prev_k = INIT_COV_COEFF * Eigen::MatrixXd::Identity(cov_prev_k.rows(),cov_prev_k.cols());
 
     //set prev_state based on the first data sample
-    prev_state.quats = Eigen::AngleAxisd(data_.predictions(0,0),Eigen::Vector3d::UnitX())  
-                        * Eigen::AngleAxisd(data_.predictions(1,0),Eigen::Vector3d::UnitY()) 
-                        * Eigen::AngleAxisd(data_.predictions(2,0),Eigen::Vector3d::UnitZ());
+    prev_state.quats = Eigen::AngleAxisd(data_.get_prediction(0,0),Eigen::Vector3d::UnitX())  
+                        * Eigen::AngleAxisd(data_.get_prediction(1,0),Eigen::Vector3d::UnitY()) 
+                        * Eigen::AngleAxisd(data_.get_prediction(2,0),Eigen::Vector3d::UnitZ());
 
-    prev_state.omegas = data_.imu_vals_raw.bottomRows(3).col(0);
+    // prev_state.omegas = data_.imu_vals_raw.col(0).bottomRows(3);
+    prev_state.omegas = data_.get_imu_col(0).bottomRows(3);
 
     //set other vectors to zero
     W.setZero();
@@ -71,7 +72,7 @@ void Ukf::update_step(int index){
 
     for(int i = 0; i < sigma_points.size(); i++){
 
-        norm = sigma_points[i].omegas.norm() * (data_.imu_ts_raw(0,index) - data_.imu_ts_raw(0,index-1));
+        norm = sigma_points[i].omegas.norm() * (data_.get_time(index) - data_.get_time(index-1));
         vector = sigma_points[i].omegas;
         vector.normalize();
 
@@ -170,7 +171,7 @@ void Ukf::kalman_update(int index){
     
     //Measure kalman gain and the gain vector
     K = Pxz.matrix() * Pvv.matrix().inverse();
-    curr_data = data_.imu_vals_raw.col(index);
+    curr_data = data_.get_imu_col(index);
     gain = K.matrix() * (curr_data - mean_z).matrix();
 
     //update state covariance matrix
@@ -184,6 +185,7 @@ void Ukf::kalman_update(int index){
 
     mean_state.quats = mean_state.quats * quat;
     mean_state.omegas += gain.bottomRows(3);
+
 }
 
 /*
@@ -196,10 +198,7 @@ void Ukf::update_prediction(int index){
     double roll,pitch,yaw;
 
     data_.euler_angles(mean_state.quats,roll,pitch,yaw);
-
-    data_.predictions(0,index) = roll;
-    data_.predictions(1,index) = pitch;
-    data_.predictions(2,index) = yaw;
+    data_.set_predictions(index,roll,pitch,yaw);
 
     prev_state.quats = mean_state.quats;
     prev_state.omegas = mean_state.omegas;
@@ -211,7 +210,7 @@ void Ukf::update_prediction(int index){
 */
 void Ukf::run(){
 
-    for(int i = 1; i < data_.imu_ts_raw.cols(); i++){
+    for(int i = 1; i < data_.get_size(); i++){
 
         calculate_sigma_points();
         update_step(i);
@@ -223,16 +222,5 @@ void Ukf::run(){
     }
 
     //save predictions
-    std::ofstream file;
-
-    file.open("predictions" + std::to_string(data_.file_no) +".txt");
-    if(file.is_open()){
-        for(int i = 0; i < data_.predictions.cols(); i++){
-            file << data_.predictions(0,i) << "," << data_.predictions(1,i) << "," << data_.predictions(2,i);
-            if(i != data_.predictions.cols() - 1) file << "\n";
-        }
-    }
-    file.close();
-
-    std::cout << "Prediction is complete and is stored in " << "predictions" << std::to_string(data_.file_no) << ".txt" << "\n";
+    data_.store_predicionts();
 }

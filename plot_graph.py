@@ -6,15 +6,18 @@ import getopt
 
 def main(argv):
 
+	if(len(argv) == 0):
+		print("Pass the file number as a command line argument");
+		sys.exit(2)
+
 	index = int(argv[0])
-	predictions = np.genfromtxt("predictions" + str(index) +".txt",delimiter = ",")
-	os.chdir("..")
 
 	if(index > 2 and index <= 0):
 		print("The input argument shoule be either 1 or 2")
 		sys.exit(2)
 
 	#load data
+	predictions = np.genfromtxt(os.getcwd() +  "/build/predictions" + str(index) +".txt",delimiter = ",")
 	vicon_data = np.genfromtxt(os.getcwd() + '/data/vicon/viconRaw' + str(index) + '_rots.txt', delimiter = ' ')
 	vicon_time = np.genfromtxt(os.getcwd() + '/data/vicon/viconRaw' + str(index) + '_ts.txt', delimiter = ' ')
 	predictions_time = np.genfromtxt(os.getcwd() + '/data/imu/imuRaw' + str(index) + '_ts.txt', delimiter = ' ')
@@ -24,7 +27,6 @@ def main(argv):
 	vicon_roll = np.arctan2(vicon_data_rots[2, 1, :], vicon_data_rots[2, 2, :])
 	vicon_pitch = np.arctan2(-vicon_data_rots[2, 0,:],np.sqrt(vicon_data_rots[2, 1, :] ** 2 + vicon_data_rots[2, 2, :] ** 2))
 	vicon_yaw = np.arctan2(vicon_data_rots[1,0,:],vicon_data_rots[0,0,:])
-
 
 	#plot the roll angles
 	plt.figure(1)

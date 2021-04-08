@@ -9,6 +9,7 @@
 
 Data_handler::Data_handler(int data_file) : file_no(data_file){
 
+    //initialize data stream
     std::ifstream file;
     std::string str,token;
     size_t pos = 0;
@@ -30,14 +31,15 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
     //resize the matrices based on the cols
     imu_ts_raw.resize(1,imu_cols);
     imu_vals_raw.resize(6,imu_cols);
-
     predictions.resize(3,imu_cols);
 
     //parse and  store the time stamps of imu
     file.open(imu_path + std::to_string(data_file) + "_ts.txt");
     while(std::getline(file,str)){
+
         imu_cols = 0;
         while((pos = str.find(" ")) != std::string::npos){
+
             imu_ts_raw(0,imu_cols) = stod(str.substr(0,pos));
             str.erase(0,pos+1);
             imu_cols++;
@@ -49,8 +51,10 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
     //parse and store imu data
     file.open(imu_path + std::to_string(data_file) + "_vals.txt");
     while(std::getline(file,str)){
+
         imu_cols = 0;
         while((pos = str.find(" ")) != std::string::npos){
+
             //the data is ordered in z,x,y order
             if(imu_rows == 3){
                 imu_vals_raw(5,imu_cols) = stod(str.substr(0,pos));
@@ -80,11 +84,13 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
     }
     file.close();
 
-    
+ 
     //get number of cols for the vicon data files to resize array
     file.open( vicon_path + std::to_string(data_file) + "_ts.txt");
     while(std::getline(file,str)){
+
         while((pos = str.find(" ")) != std::string::npos){
+
             token = str.substr(0,pos);
             str.erase(0,pos+1);
             vicon_cols++;
@@ -97,34 +103,41 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
     vicon_rots_raw.resize(9,vicon_cols);
 
 
-
     //parse and store vicon time stamps
     file.open( vicon_path + std::to_string(data_file) + "_ts.txt");
     while(std::getline(file,str)){
+
         vicon_cols = 0;
         while((pos = str.find(" ")) != std::string::npos){
+
             vicon_ts_raw(0,vicon_cols) = stod(str.substr(0,pos));
             str.erase(0,pos+1);
             vicon_cols++;
+
         }
         vicon_ts_raw(0,vicon_cols) = stod(str);
     }
     file.close();
 
+
     //parse and store vicon data
     file.open( vicon_path + std::to_string(data_file) + "_rots.txt");
     while(std::getline(file,str)){
+
         vicon_cols = 0;
         while((pos = str.find(" ")) != std::string::npos){
+
             vicon_rots_raw(vicon_rows,vicon_cols) = stod(str.substr(0,pos));
             str.erase(0,pos+1);
             vicon_cols++;
+
         }
         vicon_rots_raw(vicon_rows,vicon_cols) = stod(str);
         vicon_rows++;
     }
     file.close();
 
+    //adjust data based on pre computed biases and scale factors
     preprocess_data();
 
     std::cout << "Finished Extracting and Preprocessing data!" << "\n";
@@ -156,6 +169,9 @@ void Data_handler::preprocess_data(){
 
 }
 
+/*
+    Convert Quaternion to Euler angles  
+*/
 void Data_handler::euler_angles(Eigen::Quaterniond q, double& roll, double& pitch, double& yaw){
 
     roll = std::atan2( 2*(q.w() * q.x() + q.y() * q.z()) ,
@@ -166,4 +182,36 @@ void Data_handler::euler_angles(Eigen::Quaterniond q, double& roll, double& pitc
     yaw = std::atan2( 2*(q.w() * q.z() + q.x() * q.y()) ,
        1 - 2* (std::pow(q.y(),2)+ std::pow(q.z(),2)));
 
+}
+
+/*
+    Updates the latest predictions  
+*/
+void Data_handler::set_predictions(const int index,const double& roll,const double& pitch,const double& yaw){
+    
+    predictions(0,index) = roll;
+    predictions(1,index) = pitch;
+    predictions(2,index) = yaw;
+}
+
+/*
+    Stores predictions in .txt file  
+*/
+void Data_handler::store_predicionts(){
+
+    std::ofstream file;
+
+    file.open("predictions" + std::to_string(file_no) +".txt");
+    if(file.is_open()){
+
+        for(int i = 0; i < predictions.cols(); i++){
+
+            file << predictions(0,i) << "," << predictions(1,i) << "," << predictions(2,i);
+            if(i != predictions.cols() - 1) file << "\n";
+
+        }
+    }
+    file.close();
+
+    std::cout << "Prediction is complete and is stored in " << "predictions" << std::to_string(file_no) << ".txt" << "\n";
 }
