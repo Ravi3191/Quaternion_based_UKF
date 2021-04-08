@@ -5,7 +5,7 @@ This repository contains a C++ implementation of a quaternion based Unscented Ka
 <img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/pitch_1.png?raw=true" width="300" height="300"> <img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/roll_1.png?raw=true" width="300" height="300"> <img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/yaw_1.png?raw=true" width="300" height="300">
 
 ## Dataset 2
-<img src=https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/pitch_2.png?raw=true" width="300" height="300"> <img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/roll_2.png?raw=true" width="300" height="300"> <img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/yaw_2.png?raw=true" width="300" height="300">
+<img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/pitch_2.png?raw=true" width="300" height="300"> <img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/roll_2.png?raw=true" width="300" height="300"> <img src="https://github.com/Ravi3191/Quaternion_based_UKF/blob/main/images/yaw_2.png?raw=true" width="300" height="300">
 
 
 ## Dependencies for Running Locally
