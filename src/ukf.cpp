@@ -1,6 +1,10 @@
 #include "ukf.h"
 
-ukf::ukf(int data_num, bool vicon_available) : Data(data_num,vicon_available) {
+/*
+    Implementation of Quaternion based Unscented Kalman Filter 
+    @param data_num,  data_file is the index of the dataset that we want to evaluate on. It starts from 1
+*/
+Ukf::Ukf(int data_num) : data_(data_num) {
 
     //initialize vectors
     g_quat.w() = 0; g_quat.x() = 0; g_quat.y() = 0; g_quat.z() = 9.8;
@@ -9,44 +13,40 @@ ukf::ukf(int data_num, bool vicon_available) : Data(data_num,vicon_available) {
     R = 15 * Eigen::MatrixXd::Identity(R.rows(),R.cols());
     cov_prev_k = 50 * Eigen::MatrixXd::Identity(cov_prev_k.rows(),cov_prev_k.cols());
 
-    prev_state.quats = Eigen::AngleAxisd(Data.roll_pred(0,0),Eigen::Vector3d::UnitX())  
-                        * Eigen::AngleAxisd(Data.pitch_pred(0,0),Eigen::Vector3d::UnitY()) 
-                        * Eigen::AngleAxisd(Data.yaw_pred(0,0),Eigen::Vector3d::UnitZ());
+    //set prev_state based on the first data sample
+    prev_state.quats = Eigen::AngleAxisd(data_.predictions(0,0),Eigen::Vector3d::UnitX())  
+                        * Eigen::AngleAxisd(data_.predictions(1,0),Eigen::Vector3d::UnitY()) 
+                        * Eigen::AngleAxisd(data_.predictions(2,0),Eigen::Vector3d::UnitZ());
 
-    prev_state.omegas = Data.imu_vals_raw.bottomRows(3).col(0);
+    prev_state.omegas = data_.imu_vals_raw.bottomRows(3).col(0);
 
+    //set other vectors to zero
     W.setZero();
-    prior_z.setZero();
-    cov_w.setZero();
+    K.setZero();
     Pzz.setZero();
     Pvv.setZero();
     Pxz.setZero();
-    mean_z.setZero();
-    K.setZero();
     gain.setZero();
+    cov_w.setZero();
+    mean_z.setZero();
     cholesky.setZero();
-    //initialize prev_state to the first roll, pitch, yaw value and also sigma points
-
-    // error_omegas (sigma_points.size(),Eigen::Vector3d::Identity());
     error_omegas.setZero();
+    posteriori_cov_z.setZero();
 };
 
-void ukf::calculate_sigma_points(){
+/*
+    Extracts Quaternions based on process noise and state covariance 
+*/
+void Ukf::calculate_sigma_points(){
 
-    //calculate sigma points by cholesky decomposition
+    //calculate sigma points using cholesky decomposition
     cholesky = (Q + cov_prev_k).llt().matrixL();
     W.leftCols(cholesky.cols()) = std::sqrt(12) * cholesky;
     W.rightCols(cholesky.cols()) = -std::sqrt(12) * cholesky;
 
     cholesky_norms = W.topRows(3).colwise().norm();
-
-    if(debug){
-        std::cout << "cholesky matrix:" << "\n";
-        std::cout << std::sqrt(12) *cholesky << "\n";
-
-        std::cout << "Printing Sigma Points" << "\n";
-    }
-
+    
+    // convert axis representation to quaternion
     for(int i = 0; i < W.cols(); i++){
 
         vector = Eigen::Map<Eigen::Vector3d>(W.col(i).topRows(3).data());
@@ -57,51 +57,41 @@ void ukf::calculate_sigma_points(){
         sigma_points[i].quats = quat;
         sigma_points[i].omegas = Eigen::Map<Eigen::Vector3d>(W.col(i).bottomRows(3).data()) + prev_state.omegas;
 
-        if(debug){
-            print_state(sigma_points[i].quats);
-            print_vector(sigma_points[i].omegas);
-        }
     }
 
     sigma_points[sigma_points.size()-1].quats = prev_state.quats;
     sigma_points[sigma_points.size()-1].omegas = prev_state.omegas;
 
-    if(debug){
-        print_state(sigma_points[sigma_points.size()-1].quats);
-        print_vector(sigma_points[sigma_points.size()-1].omegas);
-    }
-
 }
 
-void ukf::update_step(int index){
-
-    if(debug){
-        std::cout << "Printing Updated Sigma Points" << "\n";
-    }
+/*
+    Calculates priori's of the sigma points using update model and dt of the next measurment.
+*/
+void Ukf::update_step(int index){
 
     for(int i = 0; i < sigma_points.size(); i++){
 
-        norm = sigma_points[i].omegas.norm() * (Data.imu_ts_raw(0,index) - Data.imu_ts_raw(0,index-1));
+        norm = sigma_points[i].omegas.norm() * (data_.imu_ts_raw(0,index) - data_.imu_ts_raw(0,index-1));
         vector = sigma_points[i].omegas;
         vector.normalize();
 
         quat = Eigen::AngleAxisd(norm,vector);
 
         sigma_points[i].quats = sigma_points[i].quats * quat;
-
-        if(debug){
-            print_state(sigma_points[i].quats);
-            print_vector(sigma_points[i].omegas);
-        }
     }
 }
 
-void ukf::get_distribution_charectoristics(){
+/*
+    Calculates the distribution mean, covariance of the priori's
+*/
+void Ukf::get_distribution_charectoristics(){
 
 
     double error{MAXFLOAT};
     double mag{0};
 
+    
+    // calcuate the mean rotatin based on gradient descent
     avg_quat = Eigen::Quaterniond::Identity();
 
     while(error > 0.9){
@@ -111,8 +101,10 @@ void ukf::get_distribution_charectoristics(){
 
             error_quat = sigma_points[i].quats * avg_quat.inverse();
             error_quat.normalize();
+
             mag = 2 * std::acos(error_quat.w());
             mag /= std::sin(mag/2);
+            
             error_omegas.col(i) =  mag * error_quat.vec();
             error_omega_mean += error_omegas.col(i);
 
@@ -124,104 +116,67 @@ void ukf::get_distribution_charectoristics(){
         error_quats_mean = Eigen::AngleAxisd(error,error_omega_mean);
         avg_quat = error_quats_mean * avg_quat;
         
-
     }
-
-    if(debug){
-            
-            std::cout << "error omegas:" << "\n";
-            std::cout << error_omegas << "\n";        
-    }
-
 
     mean_state.quats = avg_quat;
+    
+    //calculate mean omega value and populate the error matrix
     mean_state.omegas.setZero();
     for (int i = 0; i < sigma_points.size();i++){
+
         mean_state.omegas += sigma_points[i].omegas;
         cov_w.bottomRows(3).col(i) = sigma_points[i].omegas;
+
     }
     mean_state.omegas /= sigma_points.size();
 
-    if(debug){
-        std::cout << "Printing Average Transformed State" << "\n";
-        print_state(mean_state.quats);
-        print_vector(mean_state.omegas);
-    }
-
+    //calculate the covariance matrix
     cov_w.topRows(3) = error_omegas;
     cov_w.bottomRows(3).colwise() -= mean_state.omegas;
 
     cov_prev_k = (cov_w.matrix() * cov_w.matrix().transpose() )/13;
 
-
-    if(debug){
-            
-            std::cout << "cov_w:" << "\n";
-            std::cout << cov_w << "\n";        
-
-            std::cout << "cov_prev_k:" << "\n";
-            std::cout << cov_prev_k << "\n";        
-    }
-
 }
 
-
-void ukf::measurement_step(){
-    //try normalizing quat it if error is high
-    for(int i = 0; i < sigma_points.size(); i++){
-        sigma_points[i].quats.normalize();
-        prior_z.topRows(3).col(i) = (sigma_points[i].quats.inverse() * g_quat * sigma_points[i].quats).vec();
-        prior_z.bottomRows(3).col(i) = sigma_points[i].omegas;
-    }
-
-    mean_z = prior_z.rowwise().mean();
-    prior_z = prior_z.colwise() - mean_z;
-
-    Pzz = (prior_z.matrix() * prior_z.matrix().transpose())/13;
-
-    Pvv = Pzz + R;
-    Pxz = (cov_w.matrix() * prior_z.matrix().transpose()) /13;
-
-    if(debug){
-            
-            std::cout << "prior_z:" << "\n";
-            std::cout << prior_z << "\n";        
-
-            std::cout << "mean_z:" << "\n";
-            std::cout << mean_z << "\n";
-
-            std::cout << "Pzz:" << "\n";
-            std::cout << Pzz << "\n";        
-
-            std::cout << "Pvv:" << "\n";
-            std::cout << Pvv << "\n";        
-
-            std::cout << "Pxz:" << "\n";
-            std::cout << Pxz << "\n";        
-    }
-
-}
-
-void ukf::kalman_update(int index){
+/*
+    Calculates posterior's charectoristics using measurement model.
+*/
+void Ukf::measurement_step(){
     
+    //transform state and populate the posterior error matrix
+    for(int i = 0; i < sigma_points.size(); i++){
+
+        sigma_points[i].quats.normalize();
+        posteriori_cov_z.topRows(3).col(i) = (sigma_points[i].quats.inverse() * g_quat * sigma_points[i].quats).vec();
+        posteriori_cov_z.bottomRows(3).col(i) = sigma_points[i].omegas;
+
+    }
+
+    //subtract mean from posterior covariance matrix
+    mean_z = posteriori_cov_z.rowwise().mean();
+    posteriori_cov_z = posteriori_cov_z.colwise() - mean_z;
+
+    //calcuate the posterior covariance matrix and cross corelation matrix
+    Pzz = (posteriori_cov_z.matrix() * posteriori_cov_z.matrix().transpose())/13;
+    Pvv = Pzz + R;
+    Pxz = (cov_w.matrix() * posteriori_cov_z.matrix().transpose()) /13;
+
+}
+
+/*
+    Calculates Kalman gain and updates the mean estimate and state covariance.
+*/
+void Ukf::kalman_update(int index){
+    
+    //Measure kalman gain and the gain vector
     K = Pxz.matrix() * Pvv.matrix().inverse();
-    curr_data = Data.imu_vals_raw.col(index);
+    curr_data = data_.imu_vals_raw.col(index);
     gain = K.matrix() * (curr_data - mean_z).matrix();
 
+    //update state covariance matrix
     cov_prev_k -= ((K.matrix() * Pvv.matrix()) * K.matrix().transpose()); 
 
-    if(debug){
-            
-            std::cout << "cov_prev_k:" << "\n";
-            std::cout << cov_prev_k << "\n";        
-
-            std::cout << "K:" << "\n";
-            std::cout << K << "\n";        
-
-            std::cout << "gain:" << "\n";
-            std::cout << gain << "\n";        
-    }
-
+    //convert gain to quaternion and update the mean state
     vector = gain.topRows(3);
     norm = vector.norm();
     vector.normalize();
@@ -229,57 +184,34 @@ void ukf::kalman_update(int index){
 
     mean_state.quats = mean_state.quats * quat;
     mean_state.omegas += gain.bottomRows(3);
-
-    if(debug){
-        std::cout << "Printing Average Transformed State" << "\n";
-        print_state(mean_state.quats);
-        print_vector(mean_state.omegas);
-    }
 }
 
-void ukf::update_prediction(int index){
+/*
+    Convert final prediction quat to euler representation and store them in Data handler
+*/
+void Ukf::update_prediction(int index){
 
     vector = mean_state.quats.toRotationMatrix().eulerAngles(0, 1, 2);    
 
     double roll,pitch,yaw;
 
-    euler_angles(mean_state.quats,roll,pitch,yaw);
+    data_.euler_angles(mean_state.quats,roll,pitch,yaw);
 
-    Data.roll_pred(0,index) = roll;
-    Data.pitch_pred(0,index) = pitch;
-    Data.yaw_pred(0,index) = yaw;
+    data_.predictions(0,index) = roll;
+    data_.predictions(1,index) = pitch;
+    data_.predictions(2,index) = yaw;
 
     prev_state.quats = mean_state.quats;
     prev_state.omegas = mean_state.omegas;
 
-    if(debug){
-        std::cout << "Printing roll, pitch, yaw:" << "\n";
-        std::cout << roll << "," << pitch << "," << yaw << "\n";
-    }
-
 }
 
-void ukf::run(){
+/*
+    Loops through all the points in the data by calling functions sequentially and saves the final predictions.
+*/
+void Ukf::run(){
 
-    for(int i = 1; i < Data.imu_ts_raw.cols(); i++){
-
-        if(debug){
-            // std::cout << "Q matrix:" << "\n";
-            // std::cout << Q << "\n";
-
-            // std::cout << "R matrix:" << "\n";
-            // std::cout << R << "\n";
-
-            // std::cout << "g_qauat:" << "\n";
-            // std::cout << g_quat.w() << "," << g_quat.vec() << "\n";
-
-            std::cout << "cov_prev_k:" << "\n";
-            std::cout << cov_prev_k << "\n";
-
-            std::cout << "prev_state:" << "\n";
-            print_state(prev_state.quats);
-            print_vector(prev_state.omegas);
-        }
+    for(int i = 1; i < data_.imu_ts_raw.cols(); i++){
 
         calculate_sigma_points();
         update_step(i);
@@ -288,75 +220,19 @@ void ukf::run(){
         kalman_update(i);
         update_prediction(i);
 
-        if(debug){
-            if(i == 2) break;
-        }
-
     }
 
+    //save predictions
     std::ofstream file;
 
-    file.open("predictions.txt");
+    file.open("predictions" + std::to_string(data_.file_no) +".txt");
     if(file.is_open()){
-        for(int i = 0; i < Data.roll_pred.cols(); i++){
-            file << Data.roll_pred(0,i) << "," << Data.pitch_pred(0,i) << "," << Data.yaw_pred(0,i);
-            if(i != Data.roll_pred.cols() - 1) file << "\n";
+        for(int i = 0; i < data_.predictions.cols(); i++){
+            file << data_.predictions(0,i) << "," << data_.predictions(1,i) << "," << data_.predictions(2,i);
+            if(i != data_.predictions.cols() - 1) file << "\n";
         }
     }
     file.close();
 
-
-    file.open("roll_predictions.txt");
-    if(file.is_open()){
-        for(int i = 0; i < Data.roll_pred.cols(); i++){
-            file << Data.roll_pred(0,i);
-            if(i != Data.roll_pred.cols()-1) file << ",";
-        }
-        
-    }
-    file.close();
-
-    file.open("pitch_predictions.txt");
-    if(file.is_open()){
-        for(int i = 0; i < Data.pitch_pred.cols(); i++){
-            file << Data.pitch_pred(0,i);
-            if(i != Data.pitch_pred.cols()-1) file << ",";
-        }
-        
-    }
-    file.close();
-
-    file.open("yaw_predictions.txt");
-    if(file.is_open()){
-        for(int i = 0; i < Data.yaw_pred.cols(); i++){
-            file << Data.yaw_pred(0,i);
-            if(i != Data.yaw_pred.cols()-1) file << ",";
-        }
-        
-    }
-    file.close();
-
-    std::cout << Data.roll_pred.rows() << "," << Data.roll_pred.cols() << "\n";
-}
-
-void ukf::print_state(Eigen::Quaterniond q){
-
-    std::cout << q.w() << "," << q.x()<< "," << q.y()<< "," << q.z() << "\n";
-
-}
-
-void ukf::print_vector(Eigen::Vector3d v){
-    std::cout << v(0) << "," << v(1) << "," << v(2) << "\n";
-}
-
-void ukf::euler_angles(Eigen::Quaterniond q, double& roll, double& pitch, double& yaw){
-
-    roll = std::atan2( 2*(q.w() * q.x() + q.y() * q.z()) ,
-       1 - 2* (std::pow(q.x(),2)+ std::pow(q.y(),2)));
-
-    pitch = std::asin(2*(q.w()*q.y() - q.x()*q.z()));
-
-    yaw = std::atan2( 2*(q.w() * q.z() + q.x() * q.y()) ,
-       1 - 2* (std::pow(q.y(),2)+ std::pow(q.z(),2)));
-
+    std::cout << "Prediction is complete and is stored in " << "predictions" << std::to_string(data_.file_no) << ".txt" << "\n";
 }

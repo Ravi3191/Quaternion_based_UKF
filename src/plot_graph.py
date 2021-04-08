@@ -1,41 +1,58 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import io
+import os
+import sys
+import getopt
 
-# pred_roll = np.genfromtxt("roll_predictions.txt",delimiter = ",")
-# pred_pitch = -np.genfromtxt("yaw_predictions.txt",delimiter = ",")
-# pred_yaw = np.genfromtxt("pitch_predictions.txt",delimiter = ",")
+def main(argv):
 
-predictions = pred_roll = np.genfromtxt("predictions.txt",delimiter = ",")
+	index = int(argv[0])
+	predictions = np.genfromtxt("predictions" + str(index) +".txt",delimiter = ",")
+	os.chdir("..")
 
-vicon_data = io.loadmat('/home/ravi/Ravi_D/Acadamic/UPENN/Second_Sem/Learning_Robotics/HW/HW2/in_py/vicon/viconRot2.mat')
-vicon_data_rots = vicon_data['rots']
-vicon_roll = np.arctan2(vicon_data_rots[2, 1, :], vicon_data_rots[2, 2, :])
-vicon_pitch = np.arctan2(-vicon_data_rots[2, 0,:],np.sqrt(vicon_data_rots[2, 1, :] ** 2 + vicon_data_rots[2, 2, :] ** 2))
-vicon_yaw = np.arctan2(vicon_data_rots[1,0,:],vicon_data_rots[0,0,:])
+	if(index > 2 and index <= 0):
+		print("The input argument shoule be either 1 or 2")
+		sys.exit(2)
 
-# pred_roll[pred_roll >= np.pi] = -2*np.pi + pred_roll[pred_roll >= np.pi]
-# pred_roll[pred_roll < -np.pi] = 2*np.pi + pred_roll[pred_roll < -np.pi]
+	#load data
+	vicon_data = np.genfromtxt(os.getcwd() + '/data/vicon/viconRaw' + str(index) + '_rots.txt', delimiter = ' ')
+	vicon_time = np.genfromtxt(os.getcwd() + '/data/vicon/viconRaw' + str(index) + '_ts.txt', delimiter = ' ')
+	predictions_time = np.genfromtxt(os.getcwd() + '/data/imu/imuRaw' + str(index) + '_ts.txt', delimiter = ' ')
 
-# pred_pitch[pred_pitch > np.pi] = -2*np.pi + pred_pitch[pred_pitch > np.pi]
-# pred_pitch[pred_pitch < -np.pi] = 2*np.pi + pred_pitch[pred_pitch < -np.pi]
+	#convert vicon data into euler angles for comparision
+	vicon_data_rots = np.reshape(vicon_data,(3,3,vicon_data.shape[1]))
+	vicon_roll = np.arctan2(vicon_data_rots[2, 1, :], vicon_data_rots[2, 2, :])
+	vicon_pitch = np.arctan2(-vicon_data_rots[2, 0,:],np.sqrt(vicon_data_rots[2, 1, :] ** 2 + vicon_data_rots[2, 2, :] ** 2))
+	vicon_yaw = np.arctan2(vicon_data_rots[1,0,:],vicon_data_rots[0,0,:])
 
-# pred_yaw[pred_yaw > np.pi] = -2*np.pi + pred_yaw[pred_yaw > np.pi]
-# pred_yaw[pred_yaw < -np.pi] = 2*np.pi + pred_yaw[pred_yaw < -np.pi]
 
+	#plot the roll angles
+	plt.figure(1)
+	plt.plot(vicon_time,vicon_roll,'k',label = 'vicon data')
+	plt.plot(predictions_time,predictions[:,0],label = 'predictions')
+	plt.title('roll pred vs ground truth')
+	plt.legend()
+	plt.xlabel('time')
+	plt.ylabel('angle in rad')
 
-# print(np.pi)
-# print(np.max(pred_roll),np.min(pred_roll))
-# print(np.max(pred_pitch),np.min(pred_pitch))
-# print(np.max(pred_yaw),np.min(pred_yaw))
-print(predictions[:,0].shape)
-plt.figure(1)
-plt.plot(vicon_roll,'k')
-plt.plot(predictions[:,0])
-plt.figure(2)
-plt.plot(vicon_pitch,'k')
-plt.plot(predictions[:,1])
-plt.figure(3)
-plt.plot(vicon_yaw, 'k')
-plt.plot(predictions[:,2])
-plt.show()
+	#plot the pitch angles
+	plt.figure(2)
+	plt.plot(vicon_time,vicon_pitch,'k',label = 'vicon data')
+	plt.plot(predictions_time,predictions[:,1],label = 'predictions')
+	plt.title('pitch pred vs ground truth')
+	plt.xlabel('time')
+	plt.ylabel('angle in rad')
+	plt.legend()
+
+	#plot the yaw angles
+	plt.figure(3)
+	plt.plot(vicon_time, vicon_yaw ,'k',label = 'vicon data')
+	plt.plot(predictions_time,predictions[:,2],label = 'predictions')
+	plt.title('yaw pred vs ground truth')
+	plt.legend()
+	plt.xlabel('time')
+	plt.ylabel('angle in rad')
+	plt.show()
+
+if __name__ == '__main__':
+	main(sys.argv[1:])

@@ -1,5 +1,5 @@
-#ifndef DATA_PARSESR
-#define DATA_PARSESR
+#ifndef DATA_HANDLER
+#define DATA_HANDLER
 
 #include <iostream>
 #include <vector>
@@ -7,37 +7,28 @@
 #include <fstream>
 #include <Eigen/Dense>
 
-// #include "TCanvas.h"
-// #include "TROOT.h"
-// #include "TGraphErrors.h"
-// #include "TF1.h"
-// #include "TLegend.h"
-// #include "TArrow.h"
-// #include "TLatex.h"
-// #include "matplotlibcpp.h"
-
 const double PI  =3.141592653589793238463;
 
-class data_parser{
+class Data_handler{
 
     public:
 
-        data_parser(int data_file,bool gt_available);
+        Data_handler(int data_file);
 
         Eigen::Matrix<double,1,Eigen::Dynamic> imu_ts_raw;
         Eigen::Matrix<double,6,Eigen::Dynamic> imu_vals_raw;
 
-        Eigen::Matrix<double,1,Eigen::Dynamic> roll_pred;
-        Eigen::Matrix<double,1,Eigen::Dynamic> pitch_pred;
-        Eigen::Matrix<double,1,Eigen::Dynamic> yaw_pred;
+        Eigen::Matrix<double,3,Eigen::Dynamic> predictions;
+
+        int file_no{0};
+
+        void euler_angles(Eigen::Quaterniond q, double& roll, double& pitch, double& yaw);
 
     private:
 
 
         const std::string imu_path = "../data/imu/imuRaw";
         const std::string vicon_path = "../data/vicon/viconRaw";
-
-        const bool gt_available_;
 
         const std::vector<double> scale_acc {(3300.0/(1023.0*34.2)),(3300.0/(1023.0*34.2)),(3300.0/(1023.0*34.2))};
         const std::vector<double> bias_acc {510,501,502};
@@ -48,9 +39,6 @@ class data_parser{
         Eigen::Matrix<double,9,Eigen::Dynamic> vicon_rots_raw;
 
         void preprocess_data();
-        void print_data();
-
-
 };
 
 #endif
