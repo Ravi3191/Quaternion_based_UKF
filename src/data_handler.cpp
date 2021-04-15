@@ -7,7 +7,7 @@
     
 */
 
-Data_handler::Data_handler(int data_file) : file_no(data_file){
+Data_handler::Data_handler(int data_file, bool gt_available) : file_no(data_file),gt_available(gt_available){
 
     //initialize data stream
     std::ifstream file;
@@ -18,13 +18,25 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
 
     //get number of cols for the imu data files to resize array
     file.open( imu_path + std::to_string(data_file) + "_ts.txt");
+
+    if(!file.is_open()){
+
+        std::cout << "Unable to open "<< imu_path + std::to_string(data_file) + "_ts.txt" << ". Check the input file number or the data directory\n";
+        exit(1);
+
+    }
+
     while(std::getline(file,str)){
+
         while((pos = str.find(" ")) != std::string::npos){
+            
             token = str.substr(0,pos);
             str.erase(0,pos+1);
             imu_cols++;
+
         }
         imu_cols++;
+
     }
     file.close();
 
@@ -35,9 +47,18 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
     imu_vals_raw.resize(6,imu_cols);
     predictions.resize(3,imu_cols);
 
+
     //parse and  store the time stamps of imu
     int cols{0};
     file.open(imu_path + std::to_string(data_file) + "_ts.txt");
+    
+    if(!file.is_open()){
+
+        std::cout << "Unable to open "<< imu_path + std::to_string(data_file) + "_ts.txt" << ". Check the input file number or the data directory\n";
+        exit(1);
+
+    }
+
     while(std::getline(file,str)){
 
         cols = 0;
@@ -52,9 +73,18 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
     }
     file.close();
 
+
     //parse and store imu data
     cols = 0;
     file.open(imu_path + std::to_string(data_file) + "_vals.txt");
+
+    if(!file.is_open()){
+
+        std::cout << "Unable to open "<< imu_path + std::to_string(data_file) + "_vals.txt" << ". Check the input file number or the data directory\n";
+        exit(1);
+
+    }
+
     while(std::getline(file,str)){
 
         if(imu_rows >= 6){
@@ -111,86 +141,116 @@ Data_handler::Data_handler(int data_file) : file_no(data_file){
         std::cout << "Imu Data should have 6 rows Ax,Ay,Az,Wz,Wx,Wy, able to read only " << imu_rows + 1 << "\n";
         exit(1);
     }
- 
-    //get number of cols for the vicon data files to resize array
-    file.open( vicon_path + std::to_string(data_file) + "_ts.txt");
-    while(std::getline(file,str)){
 
-        while((pos = str.find(" ")) != std::string::npos){
 
-            token = str.substr(0,pos);
-            str.erase(0,pos+1);
+    if(gt_available){
+
+        //get number of cols for the vicon data files to resize array
+        file.open( vicon_path + std::to_string(data_file) + "_ts.txt");
+
+        if(!file.is_open()){
+
+            std::cout << "Unable to open "<< vicon_path + std::to_string(data_file) + "_ts.txt" << ". Check the input file number or the data directory\n";
+            exit(1);
+
+        }
+
+        while(std::getline(file,str)){
+
+            while((pos = str.find(" ")) != std::string::npos){
+
+                token = str.substr(0,pos);
+                str.erase(0,pos+1);
+                vicon_cols++;
+            }
             vicon_cols++;
         }
-        vicon_cols++;
-    }
-    file.close();
+        file.close();
 
-    std::cout << "Vicon Data has "  << vicon_cols<< " data points"<<  "\n";
+        std::cout << "Vicon Data has "  << vicon_cols<< " data points"<<  "\n";
 
-    //resize the matrices based on vicon_cols
-    vicon_ts_raw.resize(1,vicon_cols);
-    vicon_rots_raw.resize(9,vicon_cols);
-    vicon_euler.resize(3,vicon_cols);
+        //resize the matrices based on vicon_cols
+        vicon_ts_raw.resize(1,vicon_cols);
+        vicon_rots_raw.resize(9,vicon_cols);
+        vicon_euler.resize(3,vicon_cols);
 
 
-    //parse and store vicon time stamps
-    cols = 0;
-    file.open( vicon_path + std::to_string(data_file) + "_ts.txt");
-    while(std::getline(file,str)){
-
+        //parse and store vicon time stamps
         cols = 0;
-        while((pos = str.find(" ")) != std::string::npos){
+        file.open( vicon_path + std::to_string(data_file) + "_ts.txt");
 
-            vicon_ts_raw(0,cols) = stod(str.substr(0,pos));
-            str.erase(0,pos+1);
-            cols++;
+        if(!file.is_open()){
 
-        }
-        vicon_ts_raw(0,cols) = stod(str);
-    }
-    file.close();
-
-
-    //parse and store vicon data
-    file.open( vicon_path + std::to_string(data_file) + "_rots.txt");
-    while(std::getline(file,str)){
-
-        if(vicon_rows >= 9){
-            std::cout << "Imu Data should only have 9 rows\n";
-            file.close();
+            std::cout << "Unable to open "<< vicon_path + std::to_string(data_file) + "_ts.txt" << ". Check the input file number or the data directory\n";
             exit(1);
+
         }
 
-        cols = 0;
-        while((pos = str.find(" ")) != std::string::npos){
+        while(std::getline(file,str)){
 
-            if(cols > vicon_cols - 1){
+            cols = 0;
+            while((pos = str.find(" ")) != std::string::npos){
+
+                vicon_ts_raw(0,cols) = stod(str.substr(0,pos));
+                str.erase(0,pos+1);
+                cols++;
+
+            }
+            vicon_ts_raw(0,cols) = stod(str);
+        }
+        file.close();
+
+
+        //parse and store vicon data
+        file.open( vicon_path + std::to_string(data_file) + "_rots.txt");
+
+        if(!file.is_open()){
+
+            std::cout << "Unable to open "<< vicon_path + std::to_string(data_file) + "_rots.txt" << ". Check the input file number or the data directory\n";
+            exit(1);
+
+        }
+
+
+        while(std::getline(file,str)){
+
+            if(vicon_rows >= 9){
+                std::cout << "Imu Data should only have 9 rows\n";
+                file.close();
+                exit(1);
+            }
+
+            cols = 0;
+            while((pos = str.find(" ")) != std::string::npos){
+
+                if(cols > vicon_cols - 1){
+                    std::cout << "Vicon Data points size != Time Stamp Size\n";
+                    file.close();
+                    exit(1);
+                }
+
+                vicon_rots_raw(vicon_rows,cols) = stod(str.substr(0,pos));
+                str.erase(0,pos+1);
+                cols++;
+
+            }
+
+            if(cols != vicon_cols - 1){
                 std::cout << "Vicon Data points size != Time Stamp Size\n";
                 file.close();
                 exit(1);
             }
 
-            vicon_rots_raw(vicon_rows,cols) = stod(str.substr(0,pos));
-            str.erase(0,pos+1);
-            cols++;
-
+            vicon_rots_raw(vicon_rows,cols) = stod(str);
+            vicon_rows++;
         }
+        file.close();
 
-        if(cols != vicon_cols - 1){
-            std::cout << "Vicon Data points size != Time Stamp Size\n";
-            file.close();
+        if(vicon_rows < 9){
+            std::cout << "Imu Data should have 9 rows, able to read only " << imu_rows + 1 << "\n";
             exit(1);
         }
 
-        vicon_rots_raw(vicon_rows,cols) = stod(str);
-        vicon_rows++;
-    }
-    file.close();
-
-    if(vicon_rows < 9){
-        std::cout << "Imu Data should have 9 rows, able to read only " << imu_rows + 1 << "\n";
-        exit(1);
     }
 
     //adjust data based on pre computed biases and scale factors
@@ -222,22 +282,26 @@ void Data_handler::pre_process_data(){
     predictions(1,0) = std::atan2(-imu_vals_raw(0,0), std::sqrt(std::pow(imu_vals_raw(2,0),2) + std::pow(imu_vals_raw(1,0),2)));
     predictions(2,0) = 0; 
 
-    //store r,p,y of vicon and save them.
-    std::ofstream file;
-    file.open( gt_save_path + std::to_string(file_no) + ".txt");
-    if(file.is_open()){
+    if(gt_available){
 
-        double roll_gt{0},pitch_gt{0},yaw_gt{0};
-        for(int i = 0 ; i < vicon_rots_raw.cols(); i++){
+        //store r,p,y of vicon and save them.
+        std::ofstream file;
+        file.open( gt_save_path + std::to_string(file_no) + ".txt");
+        if(file.is_open()){
 
-            euler_angles(i);
-            file << vicon_euler(0,i) << "," << vicon_euler(1,i) << "," << vicon_euler(2,i);
-            if(i != vicon_rots_raw.cols() - 1) file << "\n";
+            double roll_gt{0},pitch_gt{0},yaw_gt{0};
+            for(int i = 0 ; i < vicon_rots_raw.cols(); i++){
+
+                euler_angles(i);
+                file << vicon_euler(0,i) << "," << vicon_euler(1,i) << "," << vicon_euler(2,i);
+                if(i != vicon_rots_raw.cols() - 1) file << "\n";
+
+            }
 
         }
+        file.close();
 
     }
-    file.close();
 
 }
 
@@ -279,7 +343,7 @@ void Data_handler::set_predictions(const int index,const double& roll,const doub
     predictions(1,index) = pitch;
     predictions(2,index) = yaw;
 
-    update_error(index);
+    if(gt_available) update_error(index);
 }
 
 /*
@@ -308,6 +372,8 @@ void Data_handler::update_error(const int index){
     
 */
 void Data_handler::post_process_data(){
+
+    if(!gt_available) return;
 
     roll_error /= imu_ts_raw.cols();
     pitch_error /= imu_ts_raw.cols();

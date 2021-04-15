@@ -28,5 +28,16 @@ This repository contains a C++ implementation of a quaternion based Unscented Ka
 1. Clone this repo.
 2. Make a build directory in the top level directory: `mkdir build`
 3. Compile: `cd build && cmake .. && make`
-4. Run the binary with appropriate file no (1 or 2): `./filter (file_no)`.
-5. To Visualize the plots run the plot_graph.py from home directory.
+4. Run the binary with appropriate file no (1 or 2): `./filter [-f file_number] [-v]`. `[-v]` indicates availability of ground truth vicon data. 
+5. To Visualize the results run the `python3 plot_graph.py [file_number]` from home directory.
+
+## Expected Data Structure
+* IMU
+  * Time Stamps: Stored in imuRaw[file_no]_ts.txt file each seperated by space.
+  * IMU Data: Stored in imuRaw[file_no]_vals.txt file with each row corresponding to a new data point. Each row should have six measurements (Ax,Ay,Az,Wz,Wx,Wy) seperated by comma.
+
+* Vicon (if available)
+  * Time Stamps: Stored in viconRaw[file_no]_ts.txt file each seperated by space.
+  * Vicon Data: Stored in imuRaw[file_no]_rots_.txt file with each row corresponding to a new data point. Each row should have nine measurements (1D Rotation Matrix Row-Major) seperated by comma.
+
+

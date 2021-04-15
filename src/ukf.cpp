@@ -4,7 +4,7 @@
     Implementation of Quaternion based Unscented Kalman Filter 
     @param data_num,  data_file is the index of the dataset that we want to evaluate on. It starts from 1
 */
-Ukf::Ukf(int data_num) : data_(data_num) {
+Ukf::Ukf(int data_num,bool gt_available) : data_(data_num,gt_available) {
 
     //initialize vectors
     g_quat.w() = 0; g_quat.x() = 0; g_quat.y() = 0; g_quat.z() = 9.8;

@@ -37,7 +37,7 @@ class Ukf{
 
     public:
 
-        Ukf(int data_num);
+        Ukf(int data_num, bool gt_available);
         void run();
         
     private:

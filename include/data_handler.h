@@ -13,7 +13,7 @@ class Data_handler{
 
     public:
 
-        Data_handler(int data_file);                               //constructor
+        Data_handler(int data_file, bool gt_availbale);            //constructor
 
         const int file_no;                                         //data file value
 
@@ -31,6 +31,7 @@ class Data_handler{
 
     private:
 
+        const bool gt_available;                                    // vicon data availability
         const std::string imu_path = "../data/imu/imuRaw";          // imu data path
         const std::string vicon_path = "../data/vicon/viconRaw";    // vicon data path
         const std::string save_path = "../data/predictions/predictions";  // results save path
