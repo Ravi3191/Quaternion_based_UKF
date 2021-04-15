@@ -17,8 +17,9 @@ class Data_handler{
 
         const int file_no;                                         //data file value
 
-        void euler_angles(Eigen::Quaterniond q, double& roll, double& pitch, double& yaw);
+        void euler_angles(const Eigen::Quaterniond q, double& roll, double& pitch, double& yaw);
         void store_predicionts();
+        void post_process_data();
         
         //getter and setter functions
         int get_size(){ return imu_ts_raw.cols(); }              
@@ -32,6 +33,8 @@ class Data_handler{
 
         const std::string imu_path = "../data/imu/imuRaw";          // imu data path
         const std::string vicon_path = "../data/vicon/viconRaw";    // vicon data path
+        const std::string save_path = "../data/predictions/predictions";  // results save path
+        const std::string gt_save_path = "../data/predictions/gt";  // gt rpy save path
 
         const std::vector<double> scale_acc {(3300.0/(1023.0*34.2)),
                         (3300.0/(1023.0*34.2)),
@@ -49,9 +52,28 @@ class Data_handler{
         Eigen::Matrix<double,1,Eigen::Dynamic> vicon_ts_raw;        //vicon time stamps
         Eigen::Matrix<double,9,Eigen::Dynamic> vicon_rots_raw;      //vicon data
 
-        Eigen::Matrix<double,3,Eigen::Dynamic> predictions;        //matrix to store roll,pitch,yaw predictions                                  
+        Eigen::Matrix<double,3,Eigen::Dynamic> predictions;        //matrix to store roll,pitch,yaw predictions
+        Eigen::Matrix<double,3,Eigen::Dynamic> vicon_euler;        //matrix to store roll,pitch,yaw angles of vicon data                                   
 
-        void preprocess_data();
+        int nearest_index{0};                                      //vicon index corresponding to the nearest temporal match of imu data
+        double roll_error{0};                                      // appx. roll error
+        double pitch_error{0};                                     // appx. pitch error
+        double yaw_error{0};                                       // appx. yaw error
+
+        void pre_process_data();
+        void euler_angles(const int index);
+        void update_error(const int index);
+        
+
+        /*
+            Returns the difference of angles adjusted for cyclic nature  
+        */
+        inline double min_diff(const double angle_pred, const double angle_gt){
+                
+                if(std::abs(angle_gt - angle_pred) < PI) return angle_gt - angle_pred;
+                else return 2*PI - std::abs(angle_gt - angle_pred);
+
+        }
 };
 
 #endif

@@ -99,7 +99,8 @@ void Ukf::get_distribution_charectoristics(){
 
         error_omega_mean.setZero();
         for(int i = 0; i < sigma_points.size(); i++){
-
+            
+            //calculate current error quaternion and then the error omega
             error_quat = sigma_points[i].quats * avg_quat.inverse();
             error_quat.normalize();
 
@@ -111,9 +112,12 @@ void Ukf::get_distribution_charectoristics(){
 
         }
 
+        //calculate mean and noramilze it
         error_omega_mean /= double(sigma_points.size());
         error = error_omega_mean.norm();
         error_omega_mean.normalize();
+
+        //update the avg_quat
         error_quats_mean = Eigen::AngleAxisd(error,error_omega_mean);
         avg_quat = error_quats_mean * avg_quat;
         
@@ -210,6 +214,8 @@ void Ukf::update_prediction(int index){
 */
 void Ukf::run(){
 
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
     for(int i = 1; i < data_.get_size(); i++){
 
         calculate_sigma_points();
@@ -220,6 +226,13 @@ void Ukf::run(){
         update_prediction(i);
 
     }
+
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout << "Execution Time = " << std::chrono::duration_cast<std::chrono::milliseconds> (end - begin).count() << "[ms]" << "\n";
+
+    data_.post_process_data();
+
+    std::cout << "Storing Predictions\n";
 
     //save predictions
     data_.store_predicionts();

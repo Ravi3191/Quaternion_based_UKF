@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <chrono>
 #include <Eigen/Dense>
 #include "data_handler.h"
 
@@ -18,8 +19,10 @@
 struct State
 {   
     State(){
+
         quats = Eigen::Quaterniond::Identity();
         omegas = Eigen::Vector3d::Zero();
+        
     }
 
     Eigen::Quaterniond quats;
