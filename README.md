@@ -25,8 +25,8 @@ This repository contains a C++ implementation of a quaternion based Unscented Ka
 
 
 ## Basic Build Instructions
-1. Clone this repo.
-2. Make a build directory in the top level directory: `mkdir build`
+1. Clone this repo: `git clone https://github.com/Ravi3191/Quaternion_based_UKF.git && cd Quaternion_based_UKF/`.
+2. Make a build directory in the top level directory: `mkdir build && mkdir -p data/predictions/`
 3. Compile: `cd build && cmake .. && make`
 4. Run the binary with appropriate file no (1 or 2): `./filter [-f file_number] [-v]`. `[-v]` indicates availability of ground truth vicon data. 
 5. To Visualize the results run the `python3 plot_graph.py [file_number]` from home directory.
